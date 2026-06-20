@@ -6,7 +6,11 @@ Scout Finder is a single-target SwiftUI app. It has two search paths that share 
 data model:
 
 1. **Automated providers** — code that fetches and parses a source on-device
-   (eBay, Craigslist). Output flows into `ListingStore` and the **Results** tab.
+   (eBay, Craigslist, ClassicCars.com, Hemmings). Output flows into `ListingStore` and
+   the **Results** tab. Each provider separates a **pure parse function** (string →
+   `[Listing]`) from its network fetch, so the parsing is unit-tested in isolation.
+   Classic-car sites are parsed via schema.org **JSON-LD** (`Util/JSONLD.swift`) rather
+   than CSS-class regex, for resilience.
 2. **Guided manual sources** — every other site. The app stores a prebuilt search URL
    and exact criteria; the user runs the search inside the site (one tap opens it in an
    in-app Safari sheet). This is the only reliable way to cover login/anti-bot/JS-only
@@ -79,6 +83,17 @@ in any language). A backend would:
 
 This was offered as an alternative architecture; the shipped app is self-contained so it
 needs no hosting or running cost.
+
+## Testing
+
+Provider parsing is the riskiest part of a scraper, so it's isolated and tested:
+
+- `ScoutFinderTests/ParsingTests.swift` — XCTest over fixtures in
+  `ScoutFinderTests/Fixtures/` (run with ⌘U / `xcodebuild test`).
+- `scripts/validate_parsers.py` — the same rules ported to Python, run against the same
+  fixtures, so the logic is verifiable without a Mac or network. See README → "Tests".
+
+Because providers expose pure `parse(...)` statics, the tests never touch the network.
 
 ## Extending sources
 

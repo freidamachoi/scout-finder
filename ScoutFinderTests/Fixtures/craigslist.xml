@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  xmlns="http://purl.org/rss/1.0/"
+  xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <item rdf:about="https://raleigh.craigslist.org/cto/d/scout-800/123.html">
+    <title>1966 International Scout 800 - $18,500 (Raleigh)</title>
+    <link>https://raleigh.craigslist.org/cto/d/scout-800/123.html</link>
+    <dc:date>2026-06-18T10:00:00-04:00</dc:date>
+  </item>
+  <item rdf:about="https://raleigh.craigslist.org/cto/d/ford-bronco/456.html">
+    <title>1972 Ford Bronco - $30,000 (Durham)</title>
+    <link>https://raleigh.craigslist.org/cto/d/ford-bronco/456.html</link>
+    <dc:date>2026-06-17T10:00:00-04:00</dc:date>
+  </item>
+  <item rdf:about="https://raleigh.craigslist.org/cto/d/scout-80/789.html">
+    <title>1963 International Harvester Scout 80 - $12,000 (Cary)</title>
+    <link>https://raleigh.craigslist.org/cto/d/scout-80/789.html</link>
+    <dc:date>2026-06-16T10:00:00-04:00</dc:date>
+  </item>
+</rdf:RDF>

@@ -1,0 +1,86 @@
+name: Scout search
+
+on:
+  schedule:
+    - cron: "0 13 * * *"      # daily ~13:00 UTC (≈8–9am US Eastern)
+  workflow_dispatch:           # the manual "Run workflow" button (works from phone)
+
+# Least-privilege grants this job needs.
+permissions:
+  contents: write              # commit updated state (data/seen.json)
+  issues: write                # create/update the listings issue + notify
+  pages: write                 # publish the GitHub Pages site
+  id-token: write              # required by deploy-pages
+
+concurrency:
+  group: scout-search
+  cancel-in-progress: false
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run the search
+        env:
+          CL_REGIONS: ${{ vars.CL_REGIONS }}   # optional comma-list, else defaults
+        run: python -m scout_finder.run
+
+      - name: Commit updated state
+        continue-on-error: true                 # a protected branch must not fail the run
+        run: |
+          git config user.name  "scout-finder-bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/seen.json
+          git diff --cached --quiet || git commit -m "chore: update seen listings"
+          git push
+
+      - name: Update issue + notify on new finds
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          gh label create scout-finder --color B8541A \
+            --description "Scout Finder listings" --force >/dev/null 2>&1 || true
+
+          ISSUE=$(gh issue list --label scout-finder --state open \
+                   --json number --jq '.[0].number // empty')
+
+          if [ -z "$ISSUE" ]; then
+            # Try to create assigned to the owner (so they get notifications);
+            # fall back to unassigned if the owner can't be assigned (e.g. org).
+            gh issue create --title "🚜 Scout Finder — listings" --label scout-finder \
+              --body-file out/issue.md --assignee "$OWNER" \
+              || gh issue create --title "🚜 Scout Finder — listings" --label scout-finder \
+                   --body-file out/issue.md
+            ISSUE=$(gh issue list --label scout-finder --state open \
+                     --json number --jq '.[0].number')
+            echo "Created issue #$ISSUE"
+          else
+            gh issue edit "$ISSUE" --body-file out/issue.md
+            echo "Updated issue #$ISSUE"
+          fi
+
+          if [ "$(cat out/has_new)" = "1" ]; then
+            gh issue comment "$ISSUE" --body-file out/new.md
+            echo "Commented with new listings (triggers a notification)"
+          fi
+
+      - name: Upload Pages artifact
+        continue-on-error: true                 # before Pages is enabled this is a no-op
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        continue-on-error: true
+        uses: actions/deploy-pages@v4

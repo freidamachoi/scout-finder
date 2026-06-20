@@ -32,27 +32,31 @@ struct CraigslistProvider: SearchProvider {
 
         do {
             let data = try await HTTPClient.getData(url, accept: "application/rss+xml, application/xml")
-            let items = RSSParser.parse(data)
-            return items.compactMap { item -> Listing? in
-                let title = Scrape.decodeEntities(item.title)
-                guard Scrape.isRelevant(title), let link = URL(string: item.link) else { return nil }
-                // Craigslist RSS titles are "Year Make Model - $price (location)".
-                let price = Scrape.first("(\\$[0-9,]+)", in: title)
-                return Listing(
-                    title: title,
-                    url: link,
-                    price: price,
-                    priceValue: Scrape.priceValue(price),
-                    imageURL: nil,
-                    location: region.capitalized,
-                    sourceID: "craigslist",
-                    sourceName: "Craigslist (\(region))",
-                    postedAt: item.date
-                )
-            }
+            return parse(rss: data, region: region)
         } catch {
             // A blocked/empty region must not fail the whole run.
             return []
+        }
+    }
+
+    /// Pure, testable parse of a Craigslist RSS feed for one region.
+    static func parse(rss data: Data, region: String) -> [Listing] {
+        RSSParser.parse(data).compactMap { item -> Listing? in
+            let title = Scrape.decodeEntities(item.title)
+            guard Scrape.isRelevant(title), let link = URL(string: item.link) else { return nil }
+            // Craigslist RSS titles are "Year Make Model - $price (location)".
+            let price = Scrape.first("(\\$[0-9,]+)", in: title)
+            return Listing(
+                title: title,
+                url: link,
+                price: price,
+                priceValue: Scrape.priceValue(price),
+                imageURL: nil,
+                location: region.capitalized,
+                sourceID: "craigslist",
+                sourceName: "Craigslist (\(region))",
+                postedAt: item.date
+            )
         }
     }
 }

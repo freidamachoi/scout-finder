@@ -68,27 +68,49 @@ struct EbayProvider: SearchProvider {
         guard let url = URL(string: "https://www.ebay.com/sch/6001/i.html?_nkw=international+scout&_sop=10&_ipg=60")
         else { return [] }
         let html = try await HTTPClient.getString(url)
+        return Self.parseSearchHTML(html)
+    }
 
-        // eBay renders each result inside an `<li class="s-item ...">` block.
-        let blocks = html.components(separatedBy: "class=\"s-item")
+    /// Pure, testable parse of an eBay search results page.
+    ///
+    /// Anchors on each item link (`/itm/…`) and parses the window of HTML up to the
+    /// next item link. This avoids the over-splitting trap of slicing on `class="s-item"`
+    /// (which also matches inner `s-item__title`, `s-item__price`, etc.).
+    static func parseSearchHTML(_ html: String) -> [Listing] {
+        guard let re = try? NSRegularExpression(
+            pattern: "href=\"(https://www\\.ebay\\.com/itm/[^\"]+)\"",
+            options: [.caseInsensitive]) else { return [] }
+
+        let ns = html as NSString
+        let matches = re.matches(in: html, range: NSRange(location: 0, length: ns.length))
         var out: [Listing] = []
-        for block in blocks.dropFirst() {
-            guard let href = Scrape.first("href=\"(https://www.ebay.com/itm/[^\"]+)\"", in: block),
-                  let link = URL(string: href.replacingOccurrences(of: "&amp;", with: "&"))
-            else { continue }
+        var seen = Set<String>()
 
-            let rawTitle = Scrape.first("s-item__title\"[^>]*>(?:<span[^>]*>)?([^<]+)", in: block)
-                ?? Scrape.first("s-item__title[^>]*>(.*?)</", in: block)
+        for (i, m) in matches.enumerated() {
+            let start = m.range.location
+            let end = (i + 1 < matches.count) ? matches[i + 1].range.location : ns.length
+            let window = ns.substring(with: NSRange(location: start, length: end - start))
+
+            let hrefRaw = ns.substring(with: m.range(at: 1)).replacingOccurrences(of: "&amp;", with: "&")
+            guard let url = URL(string: hrefRaw) else { continue }
+
+            let rawTitle = Scrape.first("s-item__title[^>]*>(.*?)</a>", in: window)
+                ?? Scrape.first("s-item__title[^>]*>(.*?)<", in: window)
             let title = Scrape.stripTags(rawTitle ?? "")
-            guard !title.isEmpty, !title.lowercased().contains("shop on ebay"),
+            guard !title.isEmpty,
+                  !title.lowercased().contains("shop on ebay"),
                   Scrape.isRelevant(title) else { continue }
 
-            let price = Scrape.first("s-item__price\"[^>]*>(?:<span[^>]*>)?([^<]+)", in: block).map(Scrape.stripTags)
-            let img = Scrape.first("src=\"(https://i.ebayimg.com/[^\"]+)\"", in: block)
+            // De-dup on the listing path, ignoring tracking query params.
+            let canonical = hrefRaw.components(separatedBy: "?").first ?? hrefRaw
+            guard seen.insert(canonical).inserted else { continue }
+
+            let price = Scrape.first("s-item__price[^>]*>(.*?)<", in: window).map(Scrape.stripTags)
+            let img = Scrape.first("(https://i\\.ebayimg\\.com/[^\"']+)", in: window)
 
             out.append(Listing(
                 title: title,
-                url: link,
+                url: url,
                 price: price,
                 priceValue: Scrape.priceValue(price),
                 imageURL: img.flatMap(URL.init(string:)),
@@ -98,8 +120,6 @@ struct EbayProvider: SearchProvider {
                 postedAt: nil
             ))
         }
-        // De-dup by URL.
-        var seen = Set<String>()
-        return out.filter { seen.insert($0.id).inserted }
+        return out
     }
 }

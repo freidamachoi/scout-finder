@@ -7,6 +7,20 @@ it gives you a **one-tap guided search with the exact criteria** to run inside t
 
 Built with SwiftUI, targets **iOS 17+**, no third-party dependencies.
 
+## Two ways to run it
+
+| | Native iOS app | **GitHub Actions (no Mac, phone-friendly)** |
+|---|---|---|
+| Needs | Mac + Xcode (+ Apple Dev acct to install on a phone) | just a GitHub account |
+| Daily run | iOS background task (best-effort) | reliable cron + a *Run workflow* button |
+| Results | in-app Results tab + local notifications | GitHub **Issue + push notifications** & a **GitHub Pages webpage** |
+| Live scraping | from your phone's IP (best reach) | from GitHub's servers (eBay/Craigslist reliable; Hemmings/ClassicCars may be bot-blocked) |
+
+**On a phone and want to use it now?** → see **[docs/GITHUB_USAGE.md](docs/GITHUB_USAGE.md)**.
+It runs the search on GitHub, posts new finds to an issue (with notifications), and
+publishes a webpage — no Mac, no app install. The rest of this README covers the native
+iOS app.
+
 ---
 
 ## What it does
@@ -15,8 +29,14 @@ Built with SwiftUI, targets **iOS 17+**, no third-party dependencies.
   - **eBay Motors** — official Browse API when you add a token, otherwise scrapes the
     public search page.
   - **Craigslist** — public RSS feed across each region you configure.
+  - **ClassicCars.com** and **Hemmings** — read the schema.org **JSON-LD** embedded in
+    their listing pages (a far more stable scrape target than CSS-class regex).
   - Results land in the **Results** tab with a **NEW** badge, price, location, and a
     tap-through to the listing in an in-app browser.
+  - *Anti-bot note:* ClassicCars.com and Hemmings use bot protection that can block
+    data-center IPs. From a real iPhone (residential IP, Safari engine) they generally
+    succeed; if ever blocked, that provider quietly yields nothing and the run
+    continues — both remain available via the one-tap manual search in **Sources**.
 - **Guided manual search** for every other source in your list (Bring a Trailer,
   Cars & Bids, Classic.com, Hemmings, AutoTempest, Facebook Marketplace, OfferUp,
   Cars.com, CarGurus, the Scout specialists, barn-find/curated, and the NC/VA regional
@@ -92,6 +112,37 @@ shipping to the App Store (see *Production checklist*).
 
 ---
 
+## Tests
+
+There are two layers of tests covering the parsing/filtering logic behind every
+automated provider:
+
+**1. XCTest suite (`ScoutFinderTests/`)** — runs on a Mac/simulator:
+
+```bash
+xcodegen generate
+xcodebuild test -scheme ScoutFinder -destination 'platform=iOS Simulator,name=iPhone 15'
+# or just press ⌘U in Xcode
+```
+
+Covers: relevance filtering (accepts 80/800/800A/800B, rejects Scout II and unrelated
+"scout" hits), price parsing, eBay HTML parsing, Craigslist RSS parsing, ClassicCars.com
++ Hemmings JSON-LD parsing, and `ListingStore` new-listing tracking. Fixtures live in
+`ScoutFinderTests/Fixtures/`.
+
+**2. Logic validation harness (`scripts/validate_parsers.py`)** — runs anywhere with
+Python 3, no Xcode/network needed. It ports the *exact same* parsing rules and runs them
+against the *same fixtures* as the XCTest suite, so the logic can be verified outside a
+Mac:
+
+```bash
+python3 scripts/validate_parsers.py     # 28 checks: parser/relevance/price logic
+python3 scripts/test_pipeline.py        # 11 checks: full GitHub-edition pipeline (new-detection, render)
+```
+
+Both run against the same fixtures as the Swift XCTest suite. They were used to validate
+the parsers and the GitHub Actions pipeline during development without a Mac or network.
+
 ## Testing the daily search
 
 Background tasks don't fire on the simulator on a schedule. To force a run while paused
@@ -139,12 +190,16 @@ ScoutFinder/
   Models/         Listing, Source, SearchSettings
   Data/           SourceRegistry (all sources), ListingStore, SettingsStore
   Search/         SearchProvider, SearchCoordinator
-    Providers/    EbayProvider, CraigslistProvider
-    Util/         HTTPClient, ScrapeHelpers, RSSParser
+    Providers/    EbayProvider, CraigslistProvider, ClassicCarsProvider, HemmingsProvider
+    Util/         HTTPClient, ScrapeHelpers, RSSParser, JSONLD
   Background/     BackgroundScheduler (BGAppRefreshTask), NotificationManager
   Views/          RootView, ResultsView, ListingRow, SourcesView, SettingsView, SafariView
-docs/             ARCHITECTURE.md, SOURCES.md
-project.yml       XcodeGen spec
+ScoutFinderTests/ ParsingTests.swift + Fixtures/ (eBay, Craigslist, ClassicCars, Hemmings)
+scout_finder/     GitHub Actions edition (Python): parsers, sources, fetch, render, run
+.github/workflows/scout-search.yml   daily cron + manual button + issue/Pages
+scripts/          validate_parsers.py, test_pipeline.py (run against the same fixtures)
+docs/             ARCHITECTURE.md, SOURCES.md, GITHUB_USAGE.md
+project.yml       XcodeGen spec (app + test target + scheme)
 ```
 
 See `docs/SOURCES.md` for the full source catalog and `docs/ARCHITECTURE.md` for design

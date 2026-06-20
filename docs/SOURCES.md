@@ -23,9 +23,9 @@ tab). **Login** = requires sign-in before searching.
 | Source | Mode | Notes |
 |---|---|---|
 | Classic.com | Manual | **Aggregator — set an alert here first** |
-| ClassicCars.com | Manual | |
+| **ClassicCars.com** | **Auto** | schema.org JSON-LD; manual fallback if bot-blocked |
 | Classics on Autotrader | Manual | |
-| Hemmings | Manual | Supports saved-search alerts |
+| **Hemmings** | **Auto** | schema.org JSON-LD; manual fallback if bot-blocked. Also supports saved-search alerts |
 | OldRide | Manual | |
 | Hotrod Hotline | Manual | |
 | duPont Registry | Manual | |
@@ -77,6 +77,10 @@ Login-gated sources prepend a "sign in first" instruction.
 
 If a manual source later proves reliably scrapeable (stable HTML, JSON-LD, or an RSS/API
 endpoint), implement a `SearchProvider` for it and flip its registry entry to
-`.automated` — see README → "Adding a new automated source". Good next candidates:
-**Hemmings** and **ClassicCars.com** (server-rendered listing HTML) and **Classic.com**
-(aggregator).
+`.automated` — see README → "Adding a new automated source".
+
+`ClassicCarsProvider` and `HemmingsProvider` are reference implementations of the
+**JSON-LD** approach (`Search/Util/JSONLD.swift`) — the most robust pattern for classic-
+car listing sites, since schema.org markup changes far less often than CSS classes. Good
+next candidates using the same approach: **Classics on Autotrader**, **duPont Registry**,
+and the **Classic.com** aggregator (verify each emits `Vehicle`/`Product` JSON-LD first).

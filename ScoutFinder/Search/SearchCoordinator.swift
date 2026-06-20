@@ -9,7 +9,9 @@ struct SearchCoordinator {
     /// entry in `SourceRegistry` (by `providerID`).
     static let providers: [SearchProvider] = [
         EbayProvider(),
-        CraigslistProvider()
+        CraigslistProvider(),
+        ClassicCarsProvider(),
+        HemmingsProvider()
     ]
 
     struct RunResult {
