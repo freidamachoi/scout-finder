@@ -35,7 +35,10 @@ auctions, etc.).
 
 ## Using it
 
-- **Automatic:** runs every day (~13:00 UTC). No action needed.
+- **Automatic:** runs every day at **8:00am US Eastern**. No action needed. (GitHub cron
+  is UTC and can't follow daylight saving, so the workflow lists both 12:00 and 13:00 UTC;
+  you get the 8am ET run year-round plus one harmless ~1-hour-off run that won't
+  re-notify.)
 - **On demand (the "button"):** repo → **Actions → Scout search → Run workflow**.
   This works from the GitHub mobile web view too.
 
